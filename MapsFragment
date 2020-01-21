@@ -1,0 +1,658 @@
+package com.example.prime.test3.Fragments;
+
+
+import android.content.Context;
+import android.graphics.Color;
+import android.location.Address;
+import android.location.Geocoder;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+import no.nordicsemi.android.dfu.DfuServiceInitiator;
+
+import com.example.prime.test3.R;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * A simple {@link Fragment} subclass.
+ */
+public class MapsFragment extends Fragment implements OnMapReadyCallback {
+
+    private SupportMapFragment mapFragment;
+    private GoogleMap mMap;
+    private FirebaseAuth mAuth;
+    private FirebaseUser currentUser;
+    TextView stadt;
+    LatLng latLng;
+    private long score = 0;
+    private final FirebaseDatabase database = FirebaseDatabase.getInstance();
+
+    private DatabaseReference refGlobal;
+    private DatabaseReference refGlobalPathCleaner = database.getReference("GlobalMaps/markerGlobalCleaner");
+    private DatabaseReference refGlobalPathSpotter = database.getReference("GlobalMaps/markerGlobalSpotter");
+    private DatabaseReference ref = database.getReference("GlobalMaps/Location");
+    private DatabaseReference refUser;
+    private DatabaseReference refUserDeleteSpotter = FirebaseDatabase.getInstance().getReference();
+    private DatabaseReference refUserDeleteCleaner = FirebaseDatabase.getInstance().getReference();
+    private DatabaseReference refUserScoreSpotter;
+    private DatabaseReference refUserScoreCleaner;
+    private DatabaseReference refGlobalScorer = FirebaseDatabase.getInstance().getReference();
+    private DatabaseReference refGlobalScorer2 = FirebaseDatabase.getInstance().getReference();
+
+
+
+    private static final int PERMISSIONS_REQUEST = 100;
+
+
+    private ArrayList<Marker> markerArrayListSpotter = new ArrayList<Marker>();
+    private ArrayList<Marker> markerArrayListCleaner = new ArrayList<Marker>();
+    private Map<String, Marker> mMarkerMap = new HashMap<>();
+
+
+
+    public MapsFragment() {
+        // Required empty public constructor
+    }
+
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
+        View v = inflater.inflate(R.layout.fragment_maps, container, false);
+
+
+
+        //globalmap markieren für jeden User Cleaner
+
+
+        mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
+        if (mapFragment == null) {
+            FragmentManager fm = getFragmentManager();
+            FragmentTransaction ft = fm.beginTransaction();
+            mapFragment = SupportMapFragment.newInstance();
+            ft.replace(R.id.map, mapFragment).commit();
+        }
+        mapFragment.getMapAsync(this);
+
+        return v;
+    }
+
+
+    @Override
+    public void onMapReady(final GoogleMap googleMap) {
+        mMap = googleMap;
+
+        mAuth = FirebaseAuth.getInstance();
+        currentUser = mAuth.getCurrentUser();
+
+        final Button cleaner = (Button) getView().findViewById(R.id.btn_cleaner);
+        final Button spotter = (Button) getView().findViewById(R.id.btn_spotter);
+
+
+
+        cleaner.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                cleaner.setClickable(false);
+                cleaner.setVisibility(View.INVISIBLE);
+
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        cleaner.setClickable(true);
+                        cleaner.setVisibility(View.VISIBLE);
+                    }
+                }, 3000);
+
+
+                ref.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                        Double d1 = (Double) dataSnapshot.child("latitude").getValue();
+                        Double d2 = (Double) dataSnapshot.child("longitude").getValue();
+
+                        if(d1 != null && d2 != null) {
+                            LatLng location = new LatLng(d1, d2);
+                            //mMap.addMarker(new MarkerOptions().position(location).title("Hier sauber gemacht!").icon(getMarkerIcon("#5858FA")));
+
+
+                                    mAuth = FirebaseAuth.getInstance();
+                                    String uID = mAuth.getUid();
+                                    refUser = FirebaseDatabase.getInstance().getReference("users/" + uID + "/markerUserCleaner");
+                                    refUser.setValue(location);
+                                    refGlobal = FirebaseDatabase.getInstance().getReference("GlobalMaps/markerGlobalCleaner");
+                                    refGlobal.setValue(location);
+                                }
+
+
+
+
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        System.out.println("The read failed: " + databaseError.getCode());
+                    }
+
+
+                });
+
+
+
+
+            }
+        });
+
+        spotter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                spotter.setClickable(false);
+                spotter.setVisibility(View.INVISIBLE);
+
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        spotter.setClickable(true);
+                        spotter.setVisibility(View.VISIBLE);
+                    }
+                }, 3000);
+
+                ref.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+
+
+                            Double d1 = (Double) dataSnapshot.child("latitude").getValue();
+                            Double d2 = (Double) dataSnapshot.child("longitude").getValue();
+
+                        if(d1 != null && d2 != null) {
+                            LatLng location = new LatLng(d1, d2);
+                            //  mMap.addMarker(new MarkerOptions().position(location));
+
+                            mAuth = FirebaseAuth.getInstance();
+                            String uID = mAuth.getUid();
+                            refUser = FirebaseDatabase.getInstance().getReference("users/" + uID + "/markerUserSpotter");
+                            refUser.setValue(location);
+                            refGlobal = FirebaseDatabase.getInstance().getReference("GlobalMaps/markerGlobalSpotter");
+                            refGlobal.setValue(location);
+
+                        }
+
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        System.out.println("The read failed: " + databaseError.getCode());
+                    }
+
+
+                });
+
+
+            }
+        });
+
+        //global map markieren für jeden User Cleaner
+
+        refGlobalPathCleaner.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Double d1 = (Double) dataSnapshot.child("latitude").getValue();
+                Double d2 = (Double) dataSnapshot.child("longitude").getValue();
+
+
+                if (d1 != null && d2 != null) {
+
+                    LatLng location = new LatLng(d1, d2);
+                    markerArrayListCleaner.add(mMap.addMarker(new MarkerOptions().position(location).icon(getMarkerIcon("#5858FA"))));
+                   // mMap.moveCamera(CameraUpdateFactory.newLatLng(location));
+
+
+                            refGlobal = FirebaseDatabase.getInstance().getReference("GlobalMaps/markerGlobalCleaner");
+                            refGlobal.setValue(markerArrayListCleaner.get(0).getPosition());
+
+
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                System.out.println("The read failed: " + databaseError.getCode());
+
+            }
+        });
+
+
+        //
+
+        //global map markieren für jeden User Spotter
+
+        refGlobalPathSpotter.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Double d1 = (Double) dataSnapshot.child("latitude").getValue();
+                Double d2 = (Double) dataSnapshot.child("longitude").getValue();
+
+                if (d1 != null && d2 != null) {
+
+                    LatLng location = new LatLng(d1, d2);
+                    markerArrayListSpotter.add(mMap.addMarker(new MarkerOptions().position(location)));
+                    mMap.moveCamera(CameraUpdateFactory.newLatLng(location));
+                }
+
+
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                System.out.println("The read failed: " + databaseError.getCode());
+
+            }
+        });
+
+     /*   googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+                                            @Override
+                                            public void onMapClick(LatLng latLng) {
+
+
+                                                MarkerOptions markerOptions = new MarkerOptions();
+
+                                                markerOptions.position(latLng);
+                                                markerOptions.title(latLng.latitude+ " : " +latLng.longitude);
+                                                //mMap.clear();
+                                                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng,10));
+                                                mMap.addMarker(markerOptions);
+
+                                            }
+                                        }
+        );*/
+
+
+        mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+
+            @Override
+            public boolean onMarkerClick(final Marker marker) {
+
+
+         /*          refUserDeleteSpotter.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                        mAuth = FirebaseAuth.getInstance();
+                        String uID = mAuth.getUid();
+                        refUserScoreSpotter = FirebaseDatabase.getInstance().getReference("users/" + uID + "/score");
+
+
+
+
+                        Double d1 = (Double) dataSnapshot.child("GlobalMaps").child("Location").child("latitude").getValue();
+                        Double d2 = (Double) dataSnapshot.child("GlobalMaps").child("Location").child("longitude").getValue();
+                        Long d3 = (Long) dataSnapshot.child("users").child(uID).child("score").getValue();
+                        Double d4 = (Double) dataSnapshot.child("users").child(uID).child("Location").child("latitude").getValue();
+                        Double d5 = (Double) dataSnapshot.child("users").child(uID).child("Location").child("longitude").getValue();
+
+
+
+
+                        if (d1 != null && d2 != null && d4!= null && d5!=null) {
+                            LatLng location = new LatLng(d1, d2);
+                            LatLng markerPos = marker.getPosition();
+                            double markerPosLat = marker.getPosition().latitude;
+                            double markerPosLong = marker.getPosition().longitude;
+
+
+
+                            if (distFrom(markerPosLat,markerPosLong,d4,d5) <=3000 ) {
+
+                                    refUserDeleteSpotter.child("users").child(uID).child("markerUserSpotter").removeValue();
+                                    score = d3 + 5;
+                                    refUserScoreSpotter.setValue(score);
+                                    marker.remove();
+
+
+
+
+                            }else{
+                                Toast.makeText(getContext(), "Distance to far awaay", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                        }
+
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        System.out.println("The read failed: " + databaseError.getCode());
+                    }
+                });
+
+                refUserDeleteCleaner.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                        mAuth = FirebaseAuth.getInstance();
+                        String uID = mAuth.getUid();
+                        refUserScoreCleaner = FirebaseDatabase.getInstance().getReference("users/" + uID + "/score");
+
+
+                        Double d1 = (Double) dataSnapshot.child("GlobalMaps").child("Location").child("latitude").getValue();
+                        Double d2 = (Double) dataSnapshot.child("GlobalMaps").child("Location").child("longitude").getValue();
+                        Long d3 = (Long) dataSnapshot.child("users").child(uID).child("score").getValue();
+
+
+
+
+                        if (d1 != null && d2 != null ) {
+                            LatLng location = new LatLng(d1, d2);
+                           LatLng markerPos = marker.getPosition();
+                            double markerPosLat = marker.getPosition().latitude;
+                            double markerPosLong = marker.getPosition().longitude;
+
+                            if (distFrom(markerPosLat,markerPosLong,d1,d2) <=15000) {
+                                refUserDeleteCleaner.child("users").child(uID).child("markerUserCleaner").removeValue();
+                                score = d3 + 3;
+                                refUserScoreCleaner.setValue(score);
+                                marker.remove();
+
+
+                            }
+                            else{
+                                Toast.makeText(getContext(), "Distance to far awaay", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                        }
+
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        System.out.println("The read failed: " + databaseError.getCode());
+                    }
+                });
+                */
+
+
+            //cleaner
+             refGlobalScorer.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                        mAuth = FirebaseAuth.getInstance();
+                        String uID = mAuth.getUid();
+                        refUserScoreCleaner = FirebaseDatabase.getInstance().getReference("users/" + uID + "/score");
+
+
+
+                        Double d1 = (Double) dataSnapshot.child("GlobalMaps").child("markerGlobalCleaner").child("latitude").getValue();
+                        Double d2 = (Double) dataSnapshot.child("GlobalMaps").child("markerGlobalCleaner").child("longitude").getValue();
+                        Long d3 = (Long) dataSnapshot.child("users").child(uID).child("score").getValue();
+
+
+                        if (d1 != null && d2 != null) {
+                            LatLng location = new LatLng(d1, d2);
+                            LatLng markerPos = marker.getPosition();
+                            double markerLat = marker.getPosition().latitude;
+                            double markerLong = marker.getPosition().longitude;
+
+                            if (distFrom(markerLat,markerLong,d1,d2) <= 1500) {
+                                refGlobalPathCleaner.removeValue();
+                                score = d3 + 3;
+                                refUserScoreCleaner.setValue(score);
+                                for(int i=0; i<markerArrayListCleaner.size(); i++){
+                                    if(markerArrayListCleaner.get(i).getPosition() == markerPos){
+
+                                        markerArrayListCleaner.remove(i);
+                                        i--;
+                                    }
+                                }
+
+                                marker.remove();
+
+
+
+                            }
+                            else{
+                                Toast.makeText(getContext(), "Distance to far away", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                        }
+
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        System.out.println("The read failed: " + databaseError.getCode());
+                    }
+                });
+
+             //spotter
+                refGlobalScorer2.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                        mAuth = FirebaseAuth.getInstance();
+                        String uID = mAuth.getUid();
+                        refUserScoreCleaner = FirebaseDatabase.getInstance().getReference("users/" + uID + "/score");
+
+
+
+                        Double d1 = (Double) dataSnapshot.child("GlobalMaps").child("markerGlobalSpotter").child("latitude").getValue();
+                        Double d2 = (Double) dataSnapshot.child("GlobalMaps").child("markerGlobalSpotter").child("longitude").getValue();
+                        Long d3 = (Long) dataSnapshot.child("users").child(uID).child("score").getValue();
+
+
+
+                        if (d1 != null && d2 != null) {
+                            LatLng location = new LatLng(d1, d2);
+                            LatLng markerPos = marker.getPosition();
+                            double markerLat = marker.getPosition().latitude;
+                            double markerLong = marker.getPosition().longitude;
+
+
+                            if (distFrom(markerLat,markerLong,d1,d2) <= 1500) {
+                                refGlobalPathSpotter.removeValue();
+                                score = d3 + 5;
+                                refUserScoreCleaner.setValue(score);
+                                for(int i=0; i<markerArrayListSpotter.size(); i++){
+                                    if(markerArrayListSpotter.get(i).getPosition() == markerPos){
+
+                                        markerArrayListSpotter.remove(i);
+                                        i--;
+                                    }
+                                }
+
+                                marker.remove();
+
+
+
+
+
+
+                            } else{
+                                Toast.makeText(getContext(), "Distance to far away", Toast.LENGTH_SHORT).show();
+
+                            }
+
+                        }
+
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                        System.out.println("The read failed: " + databaseError.getCode());
+                    }
+                });
+
+
+                //gain Score
+
+                //in die datenbank mit den den uid spotter und cleaner infos counter reinhauen das man mehrere spots haben kann (mit counter)
+                //counter erhöhen bei jedem btn click und dann hier ne if bedingung mit der datenbank wo man in uid usw. guckt für den score
+
+                return true;
+            }
+        });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ /*
+        if(currentUser.getDisplayName().equals("Gustav")) {
+            LatLng gummersbach = new LatLng(51.0266668, 7.569283);
+            mMap.addMarker(new MarkerOptions().position(gummersbach).title("Marker in Gummersbach"));
+            mMap.moveCamera(CameraUpdateFactory.newLatLng(gummersbach));
+        }
+        else if(currentUser.getDisplayName().equals("Ekrem")) {
+            LatLng koeln = new LatLng(50.941278, 6.958281);
+            mMap.addMarker(new MarkerOptions().position(koeln).title("Marker in Koeln"));
+            mMap.moveCamera(CameraUpdateFactory.newLatLng(koeln));
+        }
+
+      else if(stadt.getText().toString().equals("Berlin")) {
+            LatLng berlin = new LatLng(52.5243700, 13.4105300);
+            mMap.addMarker(new MarkerOptions().position(berlin).title("Marker in Berlin"));
+            mMap.moveCamera(CameraUpdateFactory.newLatLng(berlin));
+        }
+*/
+/*
+        LatLng gummersbach = new LatLng(51.0266668, 7.569283);
+        mMap.addMarker(new MarkerOptions().position(gummersbach).title("Marker in Gummersbach"));
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(gummersbach));
+
+*/
+
+
+    }
+
+    public BitmapDescriptor getMarkerIcon(String color) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(Color.parseColor(color), hsv);
+        return BitmapDescriptorFactory.defaultMarker(hsv[0]);
+
+    }
+
+    /*private void stadtRausfindenUeberGeoCoder() {
+
+        mAuth = FirebaseAuth.getInstance();
+        final String uID = mAuth.getUid();
+
+        final DatabaseReference refUserGeoCode = database.getReference("users/" +uID + "/Location");
+
+
+        //Firebase Datenbank Auslesung
+        refUserGeoCode.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Double d1 = (Double) dataSnapshot.child("latitude").getValue();
+                Double d2 = (Double) dataSnapshot.child("longitude").getValue();
+
+                if(d1 != null && d2 != null) {
+                    Geocoder geocoder = new Geocoder(getActivity(), Locale.getDefault());
+                    List<Address> addresses = null;
+                    try {
+                        addresses = geocoder.getFromLocation(d1, d2, 1);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    String cityName = addresses.get(0).getLocality();
+                    //   String stateName = addresses.get(0).getAddressLine(1);
+                    //   String countryName = addresses.get(0).getAddressLine(2);
+                    refUser = FirebaseDatabase.getInstance().getReference();
+                    refUser.child("users").child(uID).child("stadtname").setValue(cityName);
+                }
+
+
+
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                System.out.println("The read failed: " + databaseError.getCode());
+
+            }
+        });
+
+
+    }
+
+     */
+
+    public static double distFrom(double lat1, double lng1, double lat2, double lng2) {
+        double earthRadius = 6371000; //meters
+        double dLat = Math.toRadians(lat2-lat1);
+        double dLng = Math.toRadians(lng2-lng1);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLng/2) * Math.sin(dLng/2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        double dist =  (earthRadius * c);
+
+        return dist;
+    }
+
+}
